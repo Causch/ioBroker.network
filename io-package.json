@@ -12,26 +12,26 @@
                 "nl": "Eerste release"
             }
         },
-	"title": "Javascript/Node.js based network",
+	"title": "network scanner and presence detector",
         "titleLang": {
-            "en": "Javascript/Node.js based network",
-            "de": "Javascript / Node.js basierte Vorlagenadapter",
-            "ru": "Адаптер шаблонов на основе Javascript / Node.js",
-            "pt": "Adaptador de modelo baseado em Javascript / Node.js",
-            "nl": "Javascript / Node.js gebaseerde sjabloonadapter",
-            "fr": "Javascript / Node.js basé adaptateur de modèle",
-            "it": "Adattatore modello basato su Javascript / Node.js",
-            "es": "Adaptador de plantilla basado en JavaScript / Node.js"
+            "en": "network scanner and presence detector",
+            "de": "network scanner and presence detector",
+            "ru": "network scanner and presence detector",
+            "pt": "network scanner and presence detector",
+            "nl": "network scanner and presence detector",
+            "fr": "network scanner and presence detector",
+            "it": "network scanner and presence detector",
+            "es": "network scanner and presence detector"
         },
         "desc": {
-            "en": "ioBroker network",
-            "de": "ioBroker Network",
-            "ru": "ioBroker Network как образец",
-            "pt": "Modelo de adaptador para o ioBroker",
-            "fr": "ioBroker adaptateur modèle",
-            "nl": "ioBroker Network",
-            "it": "Adattatore modello ioBroker",
-            "es": "Adaptador de plantilla ioBroker"
+            "en": "scans network via arp-scan and detects presence of a devices",
+            "de": "scans network via arp-scan and detects presence of a devices",
+            "ru": "scans network via arp-scan and detects presence of a devices",
+            "pt": "scans network via arp-scan and detects presence of a devices",
+            "fr": "scans network via arp-scan and detects presence of a devices",
+            "nl": "scans network via arp-scan and detects presence of a devices",
+            "it": "scans network via arp-scan and detects presence of a devices",
+            "es": "scans network via arp-scan and detects presence of a devices"
         },
         "authors": [
             "Fikret Causevic <causch@gmx.de>"
@@ -51,21 +51,17 @@
         "icon": "network.png",
         "materialize": true,
         "enabled": true,
-        "extIcon": "https://raw.githubusercontent.com/ioBroker/ioBroker.network/master/admin/network.png",
-        "keywords": ["network", "vis", "GUI", "graphical", "scada"],
-        "readme": "https://github.com/ioBroker/ioBroker.network/blob/master/README.md",
+        "extIcon": "https://raw.githubusercontent.com/Causch/ioBroker.network/master/admin/network.png",
+        "keywords": ["network", "presence" ],
+        "readme": "https://github.com/Causch/ioBroker.network/blob/master/README.md",
         "loglevel": "info",
         "type": "general",
         "license": "MIT",
         "messagebox": false,
-        "restartAdapters": ["vis"]
+        "restartAdapters": []
     },
     "native": {
-        "test1": true,
-        "test2": 42,
-        "mySelect": "auto"
     },
     "objects": [
-
     ]
 }
