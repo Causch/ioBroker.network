@@ -108,7 +108,7 @@ function arping_ip(maclist, cb ) {
  * @param cb  callback (object list) where is in form list[mac]=ip
  **/
 function arpscan(cb) {
-    let cl=["-x","--localnet"];
+    let cl=["--localnet"];
     let arp = spawn("arp-scan", cl);
     let buffer = '';
     let errstream = '';
@@ -264,6 +264,15 @@ function refresh() {
                 native: {}
             });
             adapter.setObjectNotExists('hosts.arp.'+mac+'.presence', {
+                type: 'state',
+                common: {
+                    name: 'Presence indicator',
+                    type: 'number',
+                    role: 'indicator'
+                },
+                native: {}
+            });
+            adapter.setObjectNotExists('hosts.arp.'+mac+'.detect', {
                 type: 'state',
                 common: {
                     name: 'Presence indicator',
