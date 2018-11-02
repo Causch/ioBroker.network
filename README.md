@@ -11,13 +11,13 @@ you need arp-scan and arping installed on your iobroker machine
 
 ## Centos
 ```
-yum -y install arp-scan arping
+sudo yum -y install arp-scan arping
 ```
 
 ## Debian
 
 ```
-apt-get install arp-scan arping
+sudo apt-get install arp-scan arping
 ```
 
 # DB
