@@ -1,0 +1,71 @@
+{
+    "common": {
+        "name": "network",
+        "version": "0.0.1",
+        "news": {
+            "0.0.1": {
+                "en": "initial adapter",
+                "de": "Initiale Version",
+                "ru": "Первоначальный адаптер",
+                "pt": "Versão inicial",
+                "fr": "Version initiale",
+                "nl": "Eerste release"
+            }
+        },
+	"title": "Javascript/Node.js based network",
+        "titleLang": {
+            "en": "Javascript/Node.js based network",
+            "de": "Javascript / Node.js basierte Vorlagenadapter",
+            "ru": "Адаптер шаблонов на основе Javascript / Node.js",
+            "pt": "Adaptador de modelo baseado em Javascript / Node.js",
+            "nl": "Javascript / Node.js gebaseerde sjabloonadapter",
+            "fr": "Javascript / Node.js basé adaptateur de modèle",
+            "it": "Adattatore modello basato su Javascript / Node.js",
+            "es": "Adaptador de plantilla basado en JavaScript / Node.js"
+        },
+        "desc": {
+            "en": "ioBroker network",
+            "de": "ioBroker Network",
+            "ru": "ioBroker Network как образец",
+            "pt": "Modelo de adaptador para o ioBroker",
+            "fr": "ioBroker adaptateur modèle",
+            "nl": "ioBroker Network",
+            "it": "Adattatore modello ioBroker",
+            "es": "Adaptador de plantilla ioBroker"
+        },
+        "authors": [
+            "Fikret Causevic <causch@gmx.de>"
+        ],
+        "docs": {
+            "en": "docs/en/admin.md",
+            "ru": "docs/ru/admin.md",
+            "de": "docs/de/admin.md",
+            "es": "docs/es/admin.md",
+            "it": "docs/it/admin.md",
+            "fr": "docs/fr/admin.md",
+            "nl": "docs/nl/admin.md",
+            "pt": "docs/pt/admin.md"
+        },
+        "platform": "Javascript/Node.js",
+        "mode": "daemon",
+        "icon": "network.png",
+        "materialize": true,
+        "enabled": true,
+        "extIcon": "https://raw.githubusercontent.com/ioBroker/ioBroker.network/master/admin/network.png",
+        "keywords": ["network", "vis", "GUI", "graphical", "scada"],
+        "readme": "https://github.com/ioBroker/ioBroker.network/blob/master/README.md",
+        "loglevel": "info",
+        "type": "general",
+        "license": "MIT",
+        "messagebox": false,
+        "restartAdapters": ["vis"]
+    },
+    "native": {
+        "test1": true,
+        "test2": 42,
+        "mySelect": "auto"
+    },
+    "objects": [
+
+    ]
+}

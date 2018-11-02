@@ -1,0 +1,41 @@
+{
+  "name": "iobroker.network",
+  "version": "0.6.0",
+  "description": "network scanner and presence monitor",
+  "author": {
+    "name": "Fikret Causevic",
+    "email": "causch@gmx.de"
+  },
+  "contributors": [
+    {
+      "name": "Fikret Causevic",
+      "email": "causch@gmx.de"
+    }
+  ],
+  "homepage": "https://github.com/ioBroker/ioBroker.network",
+  "license": "MIT",
+  "keywords": [
+    "ioBroker",
+    "network",
+    "Smart Home",
+    "home automation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ioBroker/ioBroker.network"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "mocha": "^4.1.0",
+    "chai": "^4.1.2"
+  },
+  "main": "main.js",
+  "scripts": {
+    "test": "node node_modules/mocha/bin/mocha --exit"
+  },
+  "bugs": {
+    "url": "https://github.com/ioBroker/ioBroker.network/issues"
+  },
+  "readmeFilename": "README.md"
+}
