@@ -2,30 +2,7 @@
  *
  * network adapter
  *
- *
- *  file io-package.json comments:
- *
- *  {
- *      "common": {
- *          "name":         "network",                  // name has to be set and has to be equal to adapters folder name and main file name excluding extension
- *          "version":      "0.0.0",                    // use "Semantic Versioning"! see http://semver.org/
- *          "title":        "Node.js network Adapter",  // Adapter title shown in User Interfaces
- *          "authors":  [                               // Array of authord
- *              "name <mail@network.com>"
- *          ]
- *          "desc":         "network adapter",          // Adapter description shown in User Interfaces. Can be a language object {de:"...",ru:"..."} or a string
- *          "platform":     "Javascript/Node.js",       // possible values "javascript", "javascript/Node.js" - more coming
- *          "mode":         "daemon",                   // possible values "daemon", "schedule", "subscribe"
- *          "materialize":  true,                       // support of admin3
- *          "schedule":     "0 0 * * *"                 // cron-style schedule. Only needed if mode=schedule
- *          "loglevel":     "info"                      // Adapters Log Level
- *      },
- *      "native": {                                     // the native object is available via adapter.config in your adapters code - use it for configuration
- *          "test1": true,
- *          "test2": 42,
- *          "mySelect": "auto"
- *      }
- *  }
+ * network device scanner and presence detector
  *
  */
 
@@ -33,19 +10,13 @@
 /*jslint node: true */
 'use strict';
 
-// you have to require the utils module and call adapter function
 const utils =    require(__dirname + '/lib/utils'); // Get common adapter utils
 let {spawn}  = require('child_process');
-// you have to call the adapter function and pass a options object
-// name has to be set and has to be equal to adapters folder name and main file name excluding extension
-// adapter will be restarted automatically every time as the configuration changed, e.g system.adapter.network.0
 const adapter = new utils.Adapter('network');
 
-/*Variable declaration, since ES6 there are let to declare variables. Let has a more clearer definition where
-it is available then var.The variable is available inside a block and it's childs, but not outside.
-You can define the same variable name inside a child without produce a conflict with the variable of the parent block.*/
-
+// refresh timer for full scan
 let refreshTimer = null;
+// presence timer
 let presenceTimer = null;
 
 // is called when adapter shuts down - callback has to be called under any circumstances!
@@ -58,16 +29,7 @@ adapter.on('unload', function (callback) {
         callback();
     }
 });
-/*
-// is called if a subscribed object changes
-adapter.on('objectChange', function (id, obj) {
-});
-
-// is called if a subscribed state changes
-adapter.on('stateChange', function (id, state) {
-});
-*/
-// Some message was sent to adapter instance over message box. Used by email, pushover, text2speech, ...
+// maybe i get a good usage for this later...
 adapter.on('message', function (obj) {
     if (typeof obj === 'object' && obj.message) {
         if (obj.command === 'send') {
@@ -226,6 +188,7 @@ function presence() {
          });
     });
 }
+/*
 function presence_arp_scan() {
     adapter.log.debug("Starting presence scan");
     adapter.getChannelsOf(function(err2,hostlist) {
@@ -262,7 +225,7 @@ function presence_arp_scan() {
          },maclist);
     });
 
-}
+}*/
 
 function refresh() {
     adapter.log.info("Starting full arp scan");
