@@ -14,7 +14,7 @@
 <script type="text/javascript" src="words.js"></script>
  <style>
   .m .col .select-wrapper+label {
-   top: -26px;  
+   top: -26px;
   }
      .m span{
          font-size: 0.9em;
@@ -27,7 +27,7 @@
     function load(settings, onChange) {
         // example: select elements with id=key and class=value and insert value
        if (!settings) return;
-        $('.value').each(function () {            
+        $('.value').each(function () {
             var $key = $(this);
             var id = $key.attr('id');
             if ($key.attr('type') === 'checkbox') {
@@ -77,11 +77,17 @@
                 </div>
             </div>
             <div class="row">
-                <div class="input-field col s12 m6 l4">
+               <div class="input-field col s12 m6 l4">
                     <input type="number" class="value" id="arping_time" />
                     <label for="arping_time" class="translate">Number</label>
                     <!-- Important: label must come directly after input. Label is important. -->
                     <span class="translate">Presence scan every x seconds</span>
+                </div>
+                <div class="input-field col s12 m6 l4">
+                    <input type="number" class="value" id="arping_cnt" />
+                    <label for="arping_cnt" class="translate">Number</label>
+                    <!-- Important: label must come directly after input. Label is important. -->
+                    <span class="translate">Number of packets to send</span>
                 </div>
                  <div class="input-field col s12 m6 l4">
                     <input type="number" class="value" id="arpscan_time" />

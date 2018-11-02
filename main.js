@@ -18,6 +18,7 @@ const adapter = new utils.Adapter('network');
 let refreshTimer = null;
 // presence timer
 let presenceTimer = null;
+let packet_count = 5;
 
 // is called when adapter shuts down - callback has to be called under any circumstances!
 adapter.on('unload', function (callback) {
@@ -66,7 +67,7 @@ function arping_ip(maclist, cb ) {
                 adapter.log.error("Error while reading state "+mac+": "+err);
             }
             else {
-                let cl=[ ip.val, '-f', '-c','10'];
+                let cl=[ ip.val, '-f', '-c',packet_count];
 
                 let arping = spawn("arping", cl);
                 let buffer = '';
@@ -302,6 +303,7 @@ function main() {
 
     let as=adapter.config.arpscan_time||60;
     let ap=adapter.config.arping_time||1;
+    packet_count=adapter.config.arping_cnt||5;
 
     refreshTimer = setInterval(refresh, as*60000);
     presenceTimer=setInterval(presence, ap*1000);
