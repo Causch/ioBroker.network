@@ -50,7 +50,15 @@ The adapter creates objects in form of:
 
 ### 0.0.2 - 2018.11.02
 - remove -x from arp-scan options
-- added packet count for presence scan ( default is 5 ). 
+- added packet count for presence scan ( default is 5 ).
+
+### 0.0.3 - 2018.11.05
+- WOL
+- better presence detection
+- add / remove from presence detection
+- DNS names
+- Vendor list
+- domain list with server names
 
 ## License
 The MIT License (MIT)
