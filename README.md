@@ -37,7 +37,7 @@ presence of 1 => device is reachable
 1. go to your admin panel
 2. select "install from custom url" / "Installieren aus eigener URL"
 3. select tab "CUSTOM"
-4. enter https://github.com/Causch/ioBroker.network/archive/master.zip
+4. enter https://github.com/Causch/ioBroker.network.git
 5. click install
 
 # Changelog
@@ -45,6 +45,10 @@ presence of 1 => device is reachable
 ### 0.0.1 - 2018.11.02
 
 - initial release
+
+### 0.0.2 - 2018.11.02
+- remove -x from arp-scan options
+- added packet count for presence scan ( default is 5 ). 
 
 ## License
 The MIT License (MIT)
