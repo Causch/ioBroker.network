@@ -89,11 +89,35 @@
                     <!-- Important: label must come directly after input. Label is important. -->
                     <span class="translate">Number of packets to send</span>
                 </div>
+                <div class="input-field col s12 m6 l4">
+                    <input type="number" class="value" id="presence_retry" />
+                    <label for="presence_retry" class="translate">Number</label>
+                    <!-- Important: label must come directly after input. Label is important. -->
+                    <span class="translate">Retries before switching to not present</span>
+                </div>
+                <div class="input-field col s12 m6 l4">
+                    <input type="number" class="value" id="iphone_pkg" />
+                    <label for="iphone_pkg" class="translate">Number</label>
+                    <!-- Important: label must come directly after input. Label is important. -->
+                    <span class="translate">iPhone wakeup packets to send</span>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col s12">
                  <div class="input-field col s12 m6 l4">
                     <input type="number" class="value" id="arpscan_time" />
                     <label for="arpscan_time" class="translate">Number</label>
                     <!-- Important: label must come directly after input. Label is important. -->
                     <span class="translate">Scan for new devices every x minutes</span>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col s12">
+                 <div class="input-field col s12 m6 l4">
+                    <input type="number" class="value" id="wol_interval" />
+                    <label for="wol_interval" class="translate">Number</label>
+                    <!-- Important: label must come directly after input. Label is important. -->
+                    <span class="translate">Wake on LAN interval (minutes)</span>
                 </div>
             </div>
             <div class="row">

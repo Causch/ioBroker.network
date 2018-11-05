@@ -26,5 +26,25 @@ systemDictionary = {
        "it": "Presence scan every x seconds",
        "es": "Presence scan every x seconds",
        "pt": "Presence scan every x seconds"
+    },
+    "Retries before switching to not present": {
+       "nl": "Retries before switching to not present",
+       "en": "Retries before switching to not present",
+       "de": "Versuche, bevor auf \"nicht anwesend\" umgeschaltet wird",
+       "fr": "Retries before switching to not present",
+       "ru": "Retries before switching to not present",
+       "it": "Retries before switching to not present",
+       "es": "Retries before switching to not present",
+       "pt": "Retries before switching to not present",
+    },
+    "iPhone wakeup packets to send" {
+        "nl": "iPhone wakeup packets to send",
+       "en": "iPhone wakeup packets to send",
+       "de": "Anzahl iPhone wakeup Packete, bevor arp aufgerufen wird",
+       "fr": "iPhone wakeup packets to send",
+       "ru": "iPhone wakeup packets to send",
+       "it": "iPhone wakeup packets to send",
+       "es": "iPhone wakeup packets to send",
+       "pt": "iPhone wakeup packets to send",
     }
 };

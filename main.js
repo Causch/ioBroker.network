@@ -25,7 +25,7 @@ let net_config={
     refresh:  3600,
     check_finished: -1,
     iphone_pkg: 10,
-    ether_wake_cmd= null;
+    ether_wake_cmd: null,
 };
 
 let net_timers ={
@@ -668,9 +668,6 @@ function wait_for_check() {
                 net_intervals.wol=setInterval(loop_wol, net_config.wol*1000);
                 loop_wol();
             }
-            else {
-                adapter.log.warn("ether-wake not installed on this system");
-            }
         });
         w = spawn("which", ["etherwake"]);
         w.on('close',function(code) {
@@ -678,9 +675,6 @@ function wait_for_check() {
                 net_intervals.wol=setInterval(loop_wol, net_config.wol*1000);
                 net_config.ether_wake_cmd='etherwake';
                 loop_wol();
-            }
-            else {
-                adapter.log.warn("ether-wake not installed on this system");
             }
         });
         return;

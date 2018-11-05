@@ -1,8 +1,24 @@
 {
     "common": {
         "name": "network",
-        "version": "0.0.2",
+        "version": "0.0.3",
         "news": {
+            "0.0.3": {
+                "en": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
+                "de": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
+                "ru": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
+                "pt": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
+                "fr": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
+                "nl": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
+            },
+            "0.0.2": {
+                "en": "fixed arp-scan command line",
+                "de": "fixed arp-scan command line",
+                "ru": "fixed arp-scan command line",
+                "pt": "fixed arp-scan command line",
+                "fr": "fixed arp-scan command line",
+                "nl": "fixed arp-scan command line"
+            }
             "0.0.1": {
                 "en": "initial adapter",
                 "de": "Initiale Version",
