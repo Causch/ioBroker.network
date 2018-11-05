@@ -14,6 +14,8 @@ const utils =    require(__dirname + '/lib/utils'); // Get common adapter utils
 let {spawn}  = require('child_process');
 const adapter = new utils.Adapter('network');
 
+let vendor_list = require(__dirname+'/vendors.js');
+
 // refresh timer for full scan
 let refreshTimer = null;
 // presence timer
@@ -24,7 +26,7 @@ let wolTimer = null;
 // packet count for precence
 let packet_count = 5;
 let wol_interval = 60;
-
+let presence_retry=3;
 
 let macdb={
     'wol': {},
@@ -66,7 +68,10 @@ adapter.on('ready', function () {
 
 
 
-adapter.on('stateChange', function(id, state) {
+adapter.on('stateChange', stateChange);
+
+
+function stateChange(id, state) {
     let tmp=id.split('.');
     let state_id=tmp.pop();
     if (state==null) { /** deleted state... */ return; }
@@ -125,27 +130,31 @@ adapter.on('stateChange', function(id, state) {
         default:
             break;
     }
-});
+}
 /**
  * helper function to delay multiple calls
  * especially neccessary when using arp utils,
  * as packets can arrive in different processes
  **/
 function delayed_serialized_call(maclist, f_call, t_o, ...restArgs) {
-
     if (maclist.length==0) return;
     let mac=maclist.pop();
 
     let call_args=restArgs;
     call_args.unshift(mac);
 
-    f_call.apply(mac);
+    f_call.apply(null,call_args);
 
-    call_args=restArgs;
+    call_args.shift();
+    call_args.unshift(t_o);
+    call_args.unshift(f_call);
+    call_args.unshift(maclist);
     call_args.unshift(t_o);
     call_args.unshift(delayed_serialized_call);
+
     setTimeout.apply(null,call_args);
 }
+
 /**
  * arping an IP
  * there are 2 different versions of arping, depending on distribution
@@ -155,6 +164,7 @@ function delayed_serialized_call(maclist, f_call, t_o, ...restArgs) {
  * @param cb      the callback routine ( string mac, boolean presence)
  **/
 function network_arping(mac, cb, retry ) {
+    adapter.log.info("arping on "+mac);
     if (!macdb.ip.hasOwnProperty(mac)) return; // no sense if we have no ip
 
     let ip=macdb.ip[mac];
@@ -177,9 +187,10 @@ function network_arping(mac, cb, retry ) {
                 cb(mac,true);
                 break;
             case 1:
-                if (retry==0 && macdb.presence.hasOwnProperty(mac) && macdb.presence[mac]==0) {
+                if (retry>0 && macdb.presence.hasOwnProperty(mac) && macdb.presence[mac]==true) {
                     // we retry immendiatelly one time, if the last presence was 0
-                    setTimeout(network_arping,100,1);
+                    adapter.log.info("rescan of "+mac);
+                    setTimeout(network_arping,100,mac,cb,retry-1);
                 }
                 else {
                     cb(mac,false);
@@ -197,6 +208,7 @@ function network_arping(mac, cb, retry ) {
  *
  **/
 function network_wol(mac) {
+    adapter.log.info("Etherwakte on "+mac);
     let cl=[mac];
     let ether = spawn("ether-wake", cl);
     let buffer = '';
@@ -215,7 +227,7 @@ function network_wol(mac) {
             return;
         }
         else {
-            adapter.log.info("Wol sent to "+mac);
+            adapter.log.info("Wol sent to "+mac+" "+data);
         }
     });
 }
@@ -266,7 +278,7 @@ function network_arpscan(cb) {
  **/
 function loop_wol() {
     let maclist=[];
-    adapter.log.info("Starting wol");
+    //adapter.log.info("Starting wol");
     let db=macdb.wol;
     for (let mac in db) {
         if (db.hasOwnProperty(mac)) {
@@ -280,12 +292,6 @@ function loop_wol() {
                     break;
 
             }
-            if (db[mac]>0) {
-                adapter.log.info("macdb wol "+mac+" active");
-            }
-            else {
-                adapter.log.info("macdb wol "+mac+" inactive");
-            }
         }
 
     }
@@ -297,19 +303,19 @@ function loop_wol() {
  * checks the presence of the entries in the DB
  */
 function loop_presence() {
-    adapter.log.info("Starting presence scan");
+    //adapter.log.info("Starting presence scan");
     let db=macdb.detect;
-    let maclist={};
+    let maclist=[];
     for (let mac in db) {
         if (db.hasOwnProperty(mac)) {
-            if (db.detect[mac]==true) {
-                adapter.log.info("macdb presence "+mac+" active");
+            if (db[mac]==true) {
+//                adapter.log.info("macdb presence "+mac+" active");
                 if (macdb.ip.hasOwnProperty(mac)) {
-                    maclist[mac]=macdb.ip[mac];
+                    maclist.push(mac);
                 }
             }
             else {
-                adapter.log.info("macdb presence "+mac+" inactive");
+//                adapter.log.info("macdb presence "+mac+" inactive");
             }
         }
     }
@@ -319,8 +325,21 @@ function loop_presence() {
         }
         if (macdb.presence[mac]!==presence) {
             adapter.setState("hosts.arp."+mac+".presence", presence, true);
+            if (presence) {
+                adapter.log.warn(mac+" is now present");
+            }
+            else {
+                adapter.log.warn(mac+" is now not present");
+            }
         }
-    }, 0);
+        if (presence) {
+            adapter.log.info(mac+" found");
+        }
+        else {
+            adapter.log.info(mac+" not found");
+        }
+
+    }, presence_retry);
 }
 /**
  * scanning loop
@@ -349,7 +368,18 @@ function loop_scan() {
                 common: {
                     name: 'MAC addr',
                     type: 'string',
-                    role: 'indicator'
+                    role: 'indicator',
+                    write: false
+                },
+                native: {}
+            });
+            adapter.setObjectNotExists('hosts.arp.'+mac+'.vendor', {
+                type: 'state',
+                common: {
+                    name: 'Vendor',
+                    type: 'string',
+                    role: 'indicator',
+                    write: false
                 },
                 native: {}
             });
@@ -358,7 +388,8 @@ function loop_scan() {
                 common: {
                     name: 'IP Addr',
                     type: 'string',
-                    role: 'indicator'
+                    role: 'indicator',
+                    write: false
                 },
                 native: {}
             });
@@ -366,17 +397,20 @@ function loop_scan() {
                 type: 'state',
                 common: {
                     name: 'Presence indicator',
-                    type: 'number',
-                    role: 'indicator'
+                    type: 'boolean',
+                    role: 'indicator',
+                    write: false,
+                    def: false
                 },
                 native: {}
             });
             adapter.setObjectNotExists('hosts.arp.'+mac+'.detect', {
                 type: 'state',
                 common: {
-                    name: 'Presence indicator on/off',
+                    name: 'Detect presence on/off',
                     type: 'boolean',
-                    role: 'indicator'
+                    role: 'indicator',
+                    def:  false
                 },
                 native: {}
             });
@@ -385,30 +419,250 @@ function loop_scan() {
                 common: {
                     name: 'Wake on LAN',
                     type: 'number',
-                    role: 'indicator'
+                    role: 'indicator',
+                    def:  0,
+                    states: {
+                        0: "off",
+                        1: "one time msg",
+                        2: "repeated msgs"
+                    }
                 },
                 native: {}
             });
+
+
+            adapter.setObjectNotExists("hosts.arp."+mac+".dns_name", {
+                type: 'state',
+                common: {
+                    name: "DNS name",
+                    type: "array",
+                    role: 'indicator',
+                    def: "",
+                    write: false
+                }
+            });
             adapter.setState("hosts.arp."+mac+".ip", { val: ip, ack: true });
             adapter.setState("hosts.arp."+mac+".mac",{ val: mac, ack: true });
+
+            let ven=mac.replace(/\:/ig,'').substr(0,6).toUpperCase();
+            adapter.log.info("Vendor ID:"+ven);
+            if (vendor_list.vendors.hasOwnProperty(ven)) {
+                adapter.setState("hosts.arp."+mac+".vendor",{ val: vendor_list.vendors[ven], ack: true });
+            }
+            else {
+                adapter.setState("hosts.arp."+mac+".vendor",{ val: ven, ack: true });
+            }
+
+
             adapter.setState("hosts.arp."+mac+".presence", { val: 1, ack: true });
-            //adapter.setState("hosts.arp."+mac+".wol", { val: 0, ack: true });
-            //adapter.setState("hosts.arp."+mac+".detect", { val: true, ack: true });
+
+
+            var dns = require('dns');
+            dns.reverse(ip, function (err, domains) {
+              if (err) {
+                adapter.log.warn("Error searching for reverse entry");
+                adapter.setState("hosts.arp."+mac+".dns_name",{ val: [ip], ack: true});
+              }
+              else {
+                adapter.setState("hosts.arp."+mac+".dns_name", { val: domains, ack: true});
+                for (let i in domains) {
+                    if (domains.hasOwnProperty(i)) {
+                        let dn=domains[i];
+                        let fp='';
+                        let dp='';
+                        if (dn.indexOf(".")>=0) {
+                            fp=dn.substr(0,dn.indexOf("."));
+                            dp=dn.substring(dn.indexOf(".")+1,dn.length);
+                            dn=dp+'.'+fp;
+                        }
+
+                        adapter.setObjectNotExists("hosts.dns."+dn, {
+                            type: 'state',
+                            common: {
+                                name: "Host "+domains[i],
+                                type: "string",
+                                role: 'indicator',
+                                def: "",
+                                write: false
+                            }
+                        });
+                        adapter.setObjectNotExists("hosts.dns."+dn+".mac", {
+                            type: 'state',
+                            common: {
+                                name: "MAC address",
+                                type: "string",
+                                role: 'indicator',
+                                def: "",
+                                write: false
+                            }
+                        });
+                        adapter.setObjectNotExists("hosts.dns."+dn+".ip", {
+                            type: 'state',
+                            common: {
+                                name: "MAC address",
+                                type: "string",
+                                role: 'indicator',
+                                def: "",
+                                write: false
+                            }
+                        });
+                        adapter.setState("hosts.dns."+dn+".ip",ip,true);
+                        adapter.setState("hosts.dns."+dn+".mac",mac,true);
+                    }
+                }
+              }
+            });
         }
     });
 }
 
 
+function config_check() {
+    adapter.getStatesOf(function(err,dta) {
+        if (err!==null) {
+            adapter.log.error("Error in rebuild_internal");
+       }
+       else {
+            for (let i in dta) {
+                if (dta.hasOwnProperty(i)) {
+                    let obj=dta[i];
+                    let id=obj._id;
+                    let check=id.split('.');
+                    let name=check.pop();
+                    adapter.log.info("check: = "+JSON.stringify(check));
+                    switch (check[3]) {
+                        case 'arp':
+                            adapter.log.info("ARP check");
+                            switch (name) {
+                                case 'ip':
+                                    if (obj.common.type!="string" || obj.common.write!=false) {
+                                        adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "string", write: false, def: '', role: 'indicator' }});
+                                        adapter.log.info("ip redefinition: "+check[4]);
+                                    }
+                                    break;
+                                case 'mac':
+                                    if (obj.common.type!="string" || obj.common.write!=false) {
+                                        adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "string", write: false, def: '', role: 'indicator' }});
+                                        adapter.log.info("mac redefinition: "+check[4]);
+                                    }
+                                    break;
+                                case 'presence':
+                                    if (obj.common.type!="boolean" || obj.common.write!=false) {
+                                        adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "boolean", write: false, def: false, role: 'indicator' }});
+                                        adapter.log.info("presence redefinition: "+check[4]);
+                                    }
+                                    break;
+                                case 'detect':
+                                    if (obj.common.type!="boolean" || obj.common.write!=true) {
+                                        adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "boolean", write: true, def: false, role: 'indicator' }});
+                                        adapter.log.info("detect redefinition: "+check[4]);
+                                    }
+                                    break;
+                                case 'vendor':
+                                    if (obj.common.type!="string" || obj.common.write!=false) {
+                                        adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "string", write: false, def: '', role: 'indicator' }});
+                                        adapter.log.info("vendor redefinition: "+check[4]);
+                                    }
+                                    break;
+                                case 'wol':
+                                    if (obj.common.type!="number" || obj.common.write!=true || obj.common.states.constructor!==Array ) {
+                                        adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "boolean", write: true, def: '', role: 'indicator', states: {
+                                            0: "off",
+                                            1: "one time msg",
+                                            2: "repeated msgs"
+                                        } }});
+                                        adapter.log.info("wol redefinition: "+check[4]);
+                                    }
+                                    break;
+                                case 'dns_name':
+                                    if (obj.common.type!="array" || obj.common.write!=false) {
+                                        adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "array", write: false, def: '', role: 'indicator' }});
+                                    }
+                                    adapter.log.info("dns_name redefinition: "+check[4]);
+                                    break;
+                            }
+                            break;
+                        case 'dns':
+                            adapter.log.info("DNS check");
+                            switch (name) {
+                                case 'ip':
+                                    break;
+                                case 'mac':
+                                    break;
+                                case 'presence':
+                                    break;
+                                case 'detect':
+                                    break;
+                                case 'wol':
+                                    break;
+                                case 'dns_name':
+                                    break;
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+    });
+}
+
+function rebuild_internal() {
+    adapter.getStatesOf(function(err,dta) {
+       if (err!==null) {
+            adapter.log.error("Error in rebuild_internal");
+       }
+       else {
+        for (let i in dta) {
+            if (dta.hasOwnProperty(i)) {
+                let o=dta[i];
+                adapter.getState(o._id,function(errx,val) {
+                    if (errx==null) {
+                        if (val==null) {
+                            let tmp=o._id.split(".");
+                            let st=tmp.pop();
+                            switch (st) {
+                                case 'wol':
+                                    adapter.setState(o._id,0,true);
+                                    break;
+                                case 'detect':
+                                    adapter.setState(o._id,false,true);
+                                    break;
+                            }
+                        }
+                        else {
+                            stateChange(o._id,{ val: val.val, ack: true});
+                        }
+                    }
+                });
+            }
+        }
+       }
+    });
+}
+
 function main() {
     adapter.setObjectNotExists('hosts.arp', {
         type: 'device',
         common: {
-            name: 'host list',
+            name: 'MAC addresses',
             type: 'array',
             role: 'indicator'
         },
         native: {}
     });
+    adapter.setObjectNotExists('hosts.dns', {
+        type: 'device',
+        common: {
+            name: 'DNS Names',
+            type: 'array',
+            role: 'indicator'
+        },
+        native: {}
+    });
+
+    config_check();
+
+    rebuild_internal();
 
     adapter.subscribeStates('*');
 
@@ -420,7 +674,7 @@ function main() {
     wol_interval=adapter.config.wol_interval||60;
 
 
-    adapter.log.info("full scan: "+ap+" minutes, presence: "+as+" seconds");
+    adapter.log.info("full scan: "+as+" minutes, presence: "+ap+" seconds");
     adapter.log.info("arping paket cnt: "+packet_count);
     adapter.log.info("WOL interval"+wol_interval);
 
@@ -432,7 +686,7 @@ function main() {
             loop_scan();
         }
         else {
-            adapter.log.info("arp-scan not installed on this system");
+            adapter.log.warn("arp-scan not installed on this system");
         }
     });
     w = spawn("which", ["arping"]);
@@ -441,7 +695,7 @@ function main() {
             presenceTimer=setInterval(loop_presence, ap*1000);
         }
         else {
-            adapter.log.info("arping not installed on this system");
+            adapter.log.warn("arping not installed on this system");
         }
     });
 
@@ -452,7 +706,7 @@ function main() {
             loop_wol();
         }
         else {
-            adapter.log.info("ehter-wake not installed on this system");
+            adapter.log.warn("ether-wake not installed on this system");
         }
     });
 }
