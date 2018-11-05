@@ -16,17 +16,26 @@ const adapter = new utils.Adapter('network');
 
 let vendor_list = require(__dirname+'/vendors.js');
 
-// refresh timer for full scan
-let refreshTimer = null;
-// presence timer
-let presenceTimer = null;
-// wake on lan repeat timer
-let wolTimer = null;
 
-// packet count for precence
-let packet_count = 5;
-let wol_interval = 60;
-let presence_retry=3;
+let net_config={
+    packet_count:   5,
+    presence_retry: 3,
+    wol: 60,
+    presence: 60,
+    refresh:  3600,
+    check_finished: -1,
+    iphone_pkg: 10,
+    ether_wake_cmd= null;
+};
+
+let net_timers ={
+    check_wait: null
+};
+let net_intervals= {
+    presence: null,
+    wol: null,
+    refresh: null
+};
 
 let macdb={
     'wol': {},
@@ -39,9 +48,16 @@ let macdb={
 // is called when adapter shuts down - callback has to be called under any circumstances!
 adapter.on('unload', function (callback) {
     try {
-        if (refreshTimer) clearInterval(refreshTimer);
-        if (presenceTimer) clearInterval(presenceTimer);
-        if (wolTimer) clearInterval(wolTimer);
+        for (let i in net_timers) {
+            if (net_timers.hasOwnProperty(i)) {
+                clearTimeout(net_timers[i]);
+            }
+        }
+        for (let i in net_intervals) {
+            if (net_intervals.hasOwnProperty(i)) {
+                clearInterval(net_intervals[i]);
+            }
+        }
         callback();
     } catch (e) {
         callback();
@@ -155,6 +171,18 @@ function delayed_serialized_call(maclist, f_call, t_o, ...restArgs) {
     setTimeout.apply(null,call_args);
 }
 
+function iphone_wakeup(ip, retry) {
+    var dgram = require('dgram');
+    var client = dgram.createSocket('udp4');
+    client.send('', 0, 0, 5353, ip, function(err, bytes) {
+        if (err) throw err;
+        adapter.log.info('UDP message sent to '+ ip+ ' '+bytes+" bytes");
+        client.close();
+        if (retry>0) {
+            setTimeout(iphone_wakeup,10, ip, retry-1);
+        }
+    });
+}
 /**
  * arping an IP
  * there are 2 different versions of arping, depending on distribution
@@ -168,7 +196,7 @@ function network_arping(mac, cb, retry ) {
     if (!macdb.ip.hasOwnProperty(mac)) return; // no sense if we have no ip
 
     let ip=macdb.ip[mac];
-    let cl=[ ip, '-f', '-c',packet_count];
+    let cl=[ ip, '-f', '-c',net_config.packet_count];
 
     let arping = spawn("arping", cl);
     let buffer = '';
@@ -210,7 +238,7 @@ function network_arping(mac, cb, retry ) {
 function network_wol(mac) {
     adapter.log.info("Etherwakte on "+mac);
     let cl=[mac];
-    let ether = spawn("ether-wake", cl);
+    let ether = spawn(net_config.ether_wake_cmd, cl);
     let buffer = '';
     let errstream = '';
 
@@ -227,7 +255,7 @@ function network_wol(mac) {
             return;
         }
         else {
-            adapter.log.info("Wol sent to "+mac+" "+data);
+            adapter.log.info("Wol sent to "+mac+" "+buffer);
         }
     });
 }
@@ -312,6 +340,11 @@ function loop_presence() {
 //                adapter.log.info("macdb presence "+mac+" active");
                 if (macdb.ip.hasOwnProperty(mac)) {
                     maclist.push(mac);
+                    let ip=macdb.ip[mac];
+                    let tmac=mac.replace(/\:/g,'').substr(0,6);
+                    if (vendor_list.vendors.hasOwnProperty(tmac) && vendor_list.vendors[tmac].tolower.substr(0,5)=='apple') {
+                        iphone_wakeup(ip, net_config.iphone_pkg); // send wakup udp to iphone
+                    }
                 }
             }
             else {
@@ -319,6 +352,7 @@ function loop_presence() {
             }
         }
     }
+
     delayed_serialized_call(maclist,network_arping,500, function(mac, presence) {
         if (!macdb.presence.hasOwnProperty(mac)) {
             macdb.presence[mac]=null;
@@ -332,14 +366,7 @@ function loop_presence() {
                 adapter.log.warn(mac+" is now not present");
             }
         }
-        if (presence) {
-            adapter.log.info(mac+" found");
-        }
-        else {
-            adapter.log.info(mac+" not found");
-        }
-
-    }, presence_retry);
+    }, net_config.presence_retry);
 }
 /**
  * scanning loop
@@ -518,21 +545,21 @@ function loop_scan() {
 
 
 function config_check() {
+    net_config.check_finished=-1;
     adapter.getStatesOf(function(err,dta) {
         if (err!==null) {
             adapter.log.error("Error in rebuild_internal");
        }
        else {
+            net_config.check_finished=dta.length;
             for (let i in dta) {
                 if (dta.hasOwnProperty(i)) {
                     let obj=dta[i];
                     let id=obj._id;
                     let check=id.split('.');
                     let name=check.pop();
-                    adapter.log.info("check: = "+JSON.stringify(check));
                     switch (check[3]) {
                         case 'arp':
-                            adapter.log.info("ARP check");
                             switch (name) {
                                 case 'ip':
                                     if (obj.common.type!="string" || obj.common.write!=false) {
@@ -583,7 +610,6 @@ function config_check() {
                             }
                             break;
                         case 'dns':
-                            adapter.log.info("DNS check");
                             switch (name) {
                                 case 'ip':
                                     break;
@@ -600,11 +626,72 @@ function config_check() {
                             }
                             break;
                     }
+                    adapter.log.info("#checks: "+net_config.check_finished);
+                    net_config.check_finished--;
                 }
             }
         }
     });
+
 }
+
+function wait_for_check() {
+    if (net_config.check_finished==0) {
+        clearTimeout(net_timers.check_wait);
+        adapter.log.info("Checks finished, starting");
+        rebuild_internal();
+        let w = spawn("which", ["arp-scan"]);
+        w.on('close',function(code) {
+            if (code==0) {
+                adapter.log.info("Refresh: "+net_config.refresh*60000);
+                net_intervals.refresh = setInterval(loop_scan, net_config.refresh*60000);
+                loop_scan();
+            }
+            else {
+                adapter.log.warn("arp-scan not installed on this system");
+            }
+        });
+        w = spawn("which", ["arping"]);
+        w.on('close', function(code) {
+            if (code==0) {
+                net_intervals.presence=setInterval(loop_presence, net_config.presence*1000);
+            }
+            else {
+                adapter.log.warn("arping not installed on this system");
+            }
+        });
+
+        w = spawn("which", ["ether-wake"]);
+        w.on('close',function(code) {
+            if (code==0) {
+                net_config.ether_wake_cmd='ether-wake';
+                net_intervals.wol=setInterval(loop_wol, net_config.wol*1000);
+                loop_wol();
+            }
+            else {
+                adapter.log.warn("ether-wake not installed on this system");
+            }
+        });
+        w = spawn("which", ["etherwake"]);
+        w.on('close',function(code) {
+            if (code==0) {
+                net_intervals.wol=setInterval(loop_wol, net_config.wol*1000);
+                net_config.ether_wake_cmd='etherwake';
+                loop_wol();
+            }
+            else {
+                adapter.log.warn("ether-wake not installed on this system");
+            }
+        });
+        return;
+    }
+    else {
+        adapter.log.info("Checks #"+net_config.check_finished);
+    }
+    clearTimeout(net_timers.check_wait);
+    net_timers.check_wait=setTimeout(wait_for_check,1000);
+}
+
 
 function rebuild_internal() {
     adapter.getStatesOf(function(err,dta) {
@@ -661,52 +748,18 @@ function main() {
     });
 
     config_check();
+    wait_for_check();
 
-    rebuild_internal();
+    net_config.refresh =(adapter.config.arpscan_time||60);
+    net_config.presence=(adapter.config.arping_time||1);
+    net_config.packet_count=adapter.config.arping_cnt||5;
+    net_config.wol=(adapter.config.wol_interval||60);
+    net_config.iphone_pkg=adapter.config.iphone_pkg;
+    adapter.log.info("full scan: "+net_config.refresh+" minutes");
+    adapter.log.info("presence: "+net_config.presence+" seconds");
+    adapter.log.info("arping paket cnt: "+net_config.packet_count);
+    adapter.log.info("WOL interval: "+net_config.wol+" seconds");
 
     adapter.subscribeStates('*');
 
-
-
-    let as=adapter.config.arpscan_time||60;
-    let ap=adapter.config.arping_time||1;
-    packet_count=adapter.config.arping_cnt||5;
-    wol_interval=adapter.config.wol_interval||60;
-
-
-    adapter.log.info("full scan: "+as+" minutes, presence: "+ap+" seconds");
-    adapter.log.info("arping paket cnt: "+packet_count);
-    adapter.log.info("WOL interval"+wol_interval);
-
-
-    let w = spawn("which", ["arp-scan"]);
-    w.on('close',function(code) {
-        if (code==0) {
-            refreshTimer = setInterval(loop_scan, as*60000);
-            loop_scan();
-        }
-        else {
-            adapter.log.warn("arp-scan not installed on this system");
-        }
-    });
-    w = spawn("which", ["arping"]);
-    w.on('close', function(code) {
-        if (code==0) {
-            presenceTimer=setInterval(loop_presence, ap*1000);
-        }
-        else {
-            adapter.log.warn("arping not installed on this system");
-        }
-    });
-
-    w = spawn("which", ["ether-wake"]);
-    w.on('close',function(code) {
-        if (code==0) {
-            wolTimer=setInterval(loop_wol, wol_interval*1000);
-            loop_wol();
-        }
-        else {
-            adapter.log.warn("ether-wake not installed on this system");
-        }
-    });
 }
