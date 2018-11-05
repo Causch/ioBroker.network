@@ -11,13 +11,13 @@ you need arp-scan and arping installed on your iobroker machine
 
 ## Centos
 ```
-sudo yum -y install arp-scan arping
+sudo yum -y install arp-scan arping net-tools
 ```
 
 ## Debian
 
 ```
-sudo apt-get install arp-scan arping
+sudo apt-get install arp-scan arping etherwake
 ```
 
 # DB
@@ -25,12 +25,14 @@ sudo apt-get install arp-scan arping
 The adapter creates objects in form of:
 - network.0.hosts.arp // device
   - 00:11:22:33:44:55 // channel
-    - ip
-    - mac
-    - presence
+    - ip              assigned IP adress
+    - mac             mac address
+    - presence        presence of device ( true / false )
+    - detect          presence detection enabled ( true / false writable)
+    - dns_name        current dns name entry
+    - vendor          mac vendor
+    - wol             wake on lan ( 0 = off, 1 = send one packet, 2 = interval sending )
 
-presence of 0 => device not reachable
-presence of 1 => device is reachable
 
 ## Installation Steps
 
