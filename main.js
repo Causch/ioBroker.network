@@ -14,7 +14,7 @@ const utils =    require(__dirname + '/lib/utils'); // Get common adapter utils
 let {spawn}  = require('child_process');
 const adapter = new utils.Adapter('network');
 
-let vendor_list = require(__dirname+'/vendors.js');
+let vendor_list = require(__dirname+'/inc/vendors.js');
 
 
 let net_config={
@@ -41,7 +41,8 @@ let macdb={
     'wol': {},
     'detect': {},
     'ip': {},
-    'presence': {}
+    'presence': {},
+    'dns': {}
 };
 
 
@@ -87,63 +88,128 @@ adapter.on('ready', function () {
 adapter.on('stateChange', stateChange);
 
 
-function stateChange(id, state) {
-    let tmp=id.split('.');
-    let state_id=tmp.pop();
-    if (state==null) { /** deleted state... */ return; }
+
+function syncDns(mac, state_id, newval) {
+    adapter.getState('hosts.arp.'+mac+'.dns_name',function(err, val) {
+        if (val==null) return;
+        if (val.val.constructor.name=="Array") {
+            for (let i=0; i<val.val.length;i++) {
+                let dn=macdb.dns[val.val[i]];
+                if (dn==null) continue;
+                adapter.log.debug('hosts.dns.'+dn+'.'+state_id);
+                adapter.setState('hosts.dns.'+dn+'.'+state_id,newval,true);
+            }
+        }
+        else {
+            let dn=macdb.dns[val.val];
+            if (dn==null) return;
+            adapter.setState('hosts.dns.'+dn+'.'+state_id,newval,true);
+        }
+    });
+}
+
+function arpStateChange(id, state, state_id,mac) {
+    adapter.log.info("MAC: "+mac+ "State: "+state_id);
     switch (state_id) {
         case 'wol':
             if (state.ack==false) {
                 switch (state.val) {
                     case 1:
-                        let mac=tmp.pop();
-                        adapter.log.info('One time WOL msg to '+mac);
+                        adapter.log.debug('One time WOL msg to '+mac);
                         adapter.setState(id,0,true);
+                        syncDns(mac, state_id,0);
                         network_wol(mac); // send one paket out
                         break;
                     case 2:
+                        adapter.log.debug('Here 1'+mac);
                         adapter.setState(id,2,true); // confirm it
+                        syncDns(mac, state_id,2);
                         break;
                     case 0:
+                        adapter.log.debug('Here 2'+mac);
                         adapter.setState(id,0,true); // confirm it
+                        syncDns(mac, state_id,0);
+                        break;
+                    default:
+                        adapter.log.debug('Here 3'+mac);
                         break;
                 }
             }
             else {
-                let mac=tmp.pop();
+                adapter.log.debug('Here 4'+mac);
                 macdb.wol[mac]=state.val;
             }
             break;
         case 'detect':
             if (state.ack==false) {
                 if (state.val==true) {
-                    let mac=tmp.pop();
-                    adapter.log.info('detection enabled for mac '+mac);
+                    adapter.log.debug('detection enabled for mac '+mac);
                     adapter.setState(id,true,true);
+                    syncDns(mac, state_id,true);
                     //wol_direct(mac); // send one paket out
                 }
                 else {
                     adapter.setState(id,false,true); // confirm it
+                    syncDns(mac, state_id,false);
                 }
             }
             else {
-                let mac=tmp.pop();
                 macdb.detect[mac]=state.val;
             }
             break;
         case 'ip':
             if (state.ack==true) {
-                let mac=tmp.pop();
                 macdb.ip[mac]=state.val;
+                syncDns(mac, state_id,state.val);
             }
             break;
         case 'presence':
             if (state.ack==true) {
-                let mac=tmp.pop();
                 macdb.presence[mac]=state.val;
+                syncDns(mac, state_id,state.val);
             }
             break;
         default:
+            break;
+    }
+}
+
+function dnsStateChange(id,state,state_id) {
+    // search for the mac
+    let tmp=id.split('.');
+    tmp.pop(); // state
+    let dns_id=tmp.join('.');
+
+    if (state.ack==false) {
+        switch (state_id) {
+            case 'detect':
+            case 'wol':
+                adapter.getState(dns_id+'.mac',function(err,val) {
+                    adapter.log.info("State change: "+'hosts.arp.'+val.val+'.'+state_id+" "+state.val);
+                    adapter.setState('hosts.arp.'+val.val+'.'+state_id,state.val,false);
+                });
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+function stateChange(id, state) {
+    let tmp=id.split('.');
+    let state_id=tmp.pop();
+    if (state==null) { /** deleted state... */ return; }
+    tmp.shift();
+    tmp.shift();
+    tmp.shift();
+    let tree=tmp.shift();
+    switch (tree) {
+        case 'arp':
+            let mac=tmp.pop();
+            arpStateChange(id,state,state_id,mac);
+            break;
+        case 'dns':
+            dnsStateChange(id,state,state_id);
             break;
     }
 }
@@ -176,7 +242,6 @@ function iphone_wakeup(ip, retry) {
     var client = dgram.createSocket('udp4');
     client.send('', 0, 0, 5353, ip, function(err, bytes) {
         if (err) throw err;
-        adapter.log.info('UDP message sent to '+ ip+ ' '+bytes+" bytes");
         client.close();
         if (retry>0) {
             setTimeout(iphone_wakeup,10, ip, retry-1);
@@ -192,7 +257,7 @@ function iphone_wakeup(ip, retry) {
  * @param cb      the callback routine ( string mac, boolean presence)
  **/
 function network_arping(mac, cb, retry ) {
-    adapter.log.info("arping on "+mac);
+    adapter.log.debug("arping on "+mac);
     if (!macdb.ip.hasOwnProperty(mac)) return; // no sense if we have no ip
 
     let ip=macdb.ip[mac];
@@ -217,7 +282,7 @@ function network_arping(mac, cb, retry ) {
             case 1:
                 if (retry>0 && macdb.presence.hasOwnProperty(mac) && macdb.presence[mac]==true) {
                     // we retry immendiatelly one time, if the last presence was 0
-                    adapter.log.info("rescan of "+mac);
+                    adapter.log.debug("rescan of "+mac);
                     setTimeout(network_arping,100,mac,cb,retry-1);
                 }
                 else {
@@ -236,7 +301,7 @@ function network_arping(mac, cb, retry ) {
  *
  **/
 function network_wol(mac) {
-    adapter.log.info("Etherwakte on "+mac);
+    adapter.log.debug("Etherwakte on "+mac);
     let cl=[mac];
     let ether = spawn(net_config.ether_wake_cmd, cl);
     let buffer = '';
@@ -255,7 +320,7 @@ function network_wol(mac) {
             return;
         }
         else {
-            adapter.log.info("Wol sent to "+mac+" "+buffer);
+            adapter.log.debug("Wol sent to "+mac+" "+buffer);
         }
     });
 }
@@ -306,7 +371,7 @@ function network_arpscan(cb) {
  **/
 function loop_wol() {
     let maclist=[];
-    //adapter.log.info("Starting wol");
+    //adapter.log.debug("Starting wol");
     let db=macdb.wol;
     for (let mac in db) {
         if (db.hasOwnProperty(mac)) {
@@ -331,24 +396,24 @@ function loop_wol() {
  * checks the presence of the entries in the DB
  */
 function loop_presence() {
-    //adapter.log.info("Starting presence scan");
+    //adapter.log.debug("Starting presence scan");
     let db=macdb.detect;
     let maclist=[];
     for (let mac in db) {
         if (db.hasOwnProperty(mac)) {
             if (db[mac]==true) {
-//                adapter.log.info("macdb presence "+mac+" active");
+//                adapter.log.debug("macdb presence "+mac+" active");
                 if (macdb.ip.hasOwnProperty(mac)) {
                     maclist.push(mac);
                     let ip=macdb.ip[mac];
                     let tmac=mac.replace(/\:/g,'').substr(0,6);
-                    if (vendor_list.vendors.hasOwnProperty(tmac) && vendor_list.vendors[tmac].tolower.substr(0,5)=='apple') {
+                    if (vendor_list.vendors.hasOwnProperty(tmac) && vendor_list.vendors[tmac].toLowerCase().substr(0,5)=='apple') {
                         iphone_wakeup(ip, net_config.iphone_pkg); // send wakup udp to iphone
                     }
                 }
             }
             else {
-//                adapter.log.info("macdb presence "+mac+" inactive");
+//                adapter.log.debug("macdb presence "+mac+" inactive");
             }
         }
     }
@@ -373,7 +438,7 @@ function loop_presence() {
  **/
 function loop_scan() {
 
-    adapter.log.info("Starting full arp scan");
+    adapter.log.debug("Starting full arp scan");
     network_arpscan( function(list) {
         for (let i in list) {
             if (!list.hasOwnProperty(i)) continue;
@@ -472,7 +537,6 @@ function loop_scan() {
             adapter.setState("hosts.arp."+mac+".mac",{ val: mac, ack: true });
 
             let ven=mac.replace(/\:/ig,'').substr(0,6).toUpperCase();
-            adapter.log.info("Vendor ID:"+ven);
             if (vendor_list.vendors.hasOwnProperty(ven)) {
                 adapter.setState("hosts.arp."+mac+".vendor",{ val: vendor_list.vendors[ven], ack: true });
             }
@@ -481,27 +545,33 @@ function loop_scan() {
             }
 
 
-            adapter.setState("hosts.arp."+mac+".presence", { val: 1, ack: true });
+            adapter.setState("hosts.arp."+mac+".presence", { val: true, ack: true });
 
 
             var dns = require('dns');
             dns.reverse(ip, function (err, domains) {
               if (err) {
-                adapter.log.warn("Error searching for reverse entry");
+                adapter.log.debug("No reverse entry");
                 adapter.setState("hosts.arp."+mac+".dns_name",{ val: [ip], ack: true});
               }
               else {
                 adapter.setState("hosts.arp."+mac+".dns_name", { val: domains, ack: true});
+
+
                 for (let i in domains) {
                     if (domains.hasOwnProperty(i)) {
+
                         let dn=domains[i];
                         let fp='';
                         let dp='';
+                        macdb.dns[dn]=mac;
                         if (dn.indexOf(".")>=0) {
                             fp=dn.substr(0,dn.indexOf("."));
                             dp=dn.substring(dn.indexOf(".")+1,dn.length);
                             dn=dp+'.'+fp;
                         }
+
+                        macdb.dns[domains[i]]=dn;
 
                         adapter.setObjectNotExists("hosts.dns."+dn, {
                             type: 'state',
@@ -533,8 +603,51 @@ function loop_scan() {
                                 write: false
                             }
                         });
+                        adapter.setObjectNotExists('hosts.dns.'+dn+'.presence', {
+                            type: 'state',
+                            common: {
+                                name: 'Presence indicator',
+                                type: 'boolean',
+                                role: 'indicator',
+                                write: false,
+                                def: false
+                            },
+                            native: {}
+                        });
+                        adapter.setObjectNotExists('hosts.dns.'+dn+'.detect', {
+                            type: 'state',
+                            common: {
+                                name: 'Detect presence on/off',
+                                type: 'boolean',
+                                role: 'indicator',
+                                def:  false
+                            },
+                            native: {}
+                        });
+                        adapter.setObjectNotExists('hosts.dns.'+dn+'.wol', {
+                            type: 'state',
+                            common: {
+                                name: 'Wake on LAN',
+                                type: 'number',
+                                role: 'indicator',
+                                def:  0,
+                                states: {
+                                    0: "off",
+                                    1: "one time msg",
+                                    2: "repeated msgs"
+                                }
+                            },
+                            native: {}
+                        });
                         adapter.setState("hosts.dns."+dn+".ip",ip,true);
                         adapter.setState("hosts.dns."+dn+".mac",mac,true);
+                        adapter.setState("hosts.dns."+dn+".presence",true,true);
+                        if (vendor_list.vendors.hasOwnProperty(ven)) {
+                            adapter.setState("hosts.dns."+dn+".vendor",{ val: vendor_list.vendors[ven], ack: true });
+                        }
+                        else {
+                            adapter.setState("hosts.dns."+dn+".vendor",{ val: ven, ack: true });
+                        }
                     }
                 }
               }
@@ -564,31 +677,31 @@ function config_check() {
                                 case 'ip':
                                     if (obj.common.type!="string" || obj.common.write!=false) {
                                         adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "string", write: false, def: '', role: 'indicator' }});
-                                        adapter.log.info("ip redefinition: "+check[4]);
+                                        adapter.log.debug("ip redefinition: "+check[4]);
                                     }
                                     break;
                                 case 'mac':
                                     if (obj.common.type!="string" || obj.common.write!=false) {
                                         adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "string", write: false, def: '', role: 'indicator' }});
-                                        adapter.log.info("mac redefinition: "+check[4]);
+                                        adapter.log.debug("mac redefinition: "+check[4]);
                                     }
                                     break;
                                 case 'presence':
                                     if (obj.common.type!="boolean" || obj.common.write!=false) {
                                         adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "boolean", write: false, def: false, role: 'indicator' }});
-                                        adapter.log.info("presence redefinition: "+check[4]);
+                                        adapter.log.debug("presence redefinition: "+check[4]);
                                     }
                                     break;
                                 case 'detect':
                                     if (obj.common.type!="boolean" || obj.common.write!=true) {
                                         adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "boolean", write: true, def: false, role: 'indicator' }});
-                                        adapter.log.info("detect redefinition: "+check[4]);
+                                        adapter.log.debug("detect redefinition: "+check[4]);
                                     }
                                     break;
                                 case 'vendor':
                                     if (obj.common.type!="string" || obj.common.write!=false) {
                                         adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "string", write: false, def: '', role: 'indicator' }});
-                                        adapter.log.info("vendor redefinition: "+check[4]);
+                                        adapter.log.debug("vendor redefinition: "+check[4]);
                                     }
                                     break;
                                 case 'wol':
@@ -598,14 +711,14 @@ function config_check() {
                                             1: "one time msg",
                                             2: "repeated msgs"
                                         } }});
-                                        adapter.log.info("wol redefinition: "+check[4]);
+                                        adapter.log.debug("wol redefinition: "+check[4]);
                                     }
                                     break;
                                 case 'dns_name':
                                     if (obj.common.type!="array" || obj.common.write!=false) {
                                         adapter.setObject(obj._id, { type: "state", native: obj.native, common: { name: obj.common.name, type: "array", write: false, def: '', role: 'indicator' }});
                                     }
-                                    adapter.log.info("dns_name redefinition: "+check[4]);
+                                    adapter.log.debug("dns_name redefinition: "+check[4]);
                                     break;
                             }
                             break;
@@ -626,7 +739,7 @@ function config_check() {
                             }
                             break;
                     }
-                    adapter.log.info("#checks: "+net_config.check_finished);
+                    adapter.log.debug("#checks: "+net_config.check_finished);
                     net_config.check_finished--;
                 }
             }
@@ -638,12 +751,12 @@ function config_check() {
 function wait_for_check() {
     if (net_config.check_finished==0) {
         clearTimeout(net_timers.check_wait);
-        adapter.log.info("Checks finished, starting");
+        adapter.log.debug("Checks finished, starting");
         rebuild_internal();
         let w = spawn("which", ["arp-scan"]);
         w.on('close',function(code) {
             if (code==0) {
-                adapter.log.info("Refresh: "+net_config.refresh*60000);
+                adapter.log.debug("Refresh: "+net_config.refresh*60000);
                 net_intervals.refresh = setInterval(loop_scan, net_config.refresh*60000);
                 loop_scan();
             }
@@ -680,7 +793,7 @@ function wait_for_check() {
         return;
     }
     else {
-        adapter.log.info("Checks #"+net_config.check_finished);
+        adapter.log.debug("Checks #"+net_config.check_finished);
     }
     clearTimeout(net_timers.check_wait);
     net_timers.check_wait=setTimeout(wait_for_check,1000);
