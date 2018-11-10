@@ -60,6 +60,9 @@ The adapter creates objects in form of:
 - Vendor list
 - domain list with server names
 
+### 0.0.4 - 2018.11.10
+- synchronization of DNS and ARP entries
+
 ## License
 The MIT License (MIT)
 

@@ -1,31 +1,22 @@
 {
     "common": {
         "name": "network",
-        "version": "0.0.3",
+        "version": "0.0.4",
         "news": {
+            "0.0.4": {
+                "en": "Synchronizing or dns and arp entries",
+                "de": "Synchronization der DNS und ARP Einträge"
+            },
             "0.0.3": {
                 "en": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
-                "de": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
-                "ru": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
-                "pt": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
-                "fr": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names",
-                "nl": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names"
+                "de": "Wol feature added, better detection options, presence scan only if activated for a device, DNS names"
             },
             "0.0.2": {
                 "en": "fixed arp-scan command line",
-                "de": "fixed arp-scan command line",
-                "ru": "fixed arp-scan command line",
-                "pt": "fixed arp-scan command line",
-                "fr": "fixed arp-scan command line",
-                "nl": "fixed arp-scan command line"
-            },
+                "de": "fixed arp-scan command line",            },
             "0.0.1": {
                 "en": "initial adapter",
-                "de": "Initiale Version",
-                "ru": "Первоначальный адаптер",
-                "pt": "Versão inicial",
-                "fr": "Version initiale",
-                "nl": "Eerste release"
+                "de": "Initiale Version"
             }
         },
 	"title": "network scanner and presence detector",

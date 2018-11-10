@@ -1,6 +1,6 @@
 {
   "name": "iobroker.network",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "network scanner and presence monitor",
   "author": {
     "name": "Fikret Causevic",
