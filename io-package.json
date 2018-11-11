@@ -13,7 +13,8 @@
             },
             "0.0.2": {
                 "en": "fixed arp-scan command line",
-                "de": "fixed arp-scan command line",            },
+                "de": "fixed arp-scan command line" 
+	    },
             "0.0.1": {
                 "en": "initial adapter",
                 "de": "Initiale Version"
